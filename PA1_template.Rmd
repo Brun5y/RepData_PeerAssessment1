@@ -1,25 +1,182 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
+Reproducible Research - Peer Assessment 1
+=====================================================
+
+###The goal of this assignment was to read and analyze an activity monitoring data set. The entire process was to be recorded in an R Markdown file, which broke up the analysis into distinct parts.  This file shows the code that was used to do the analysis, as well as, the output at various stages of the analysis.
 
 
-## Loading and preprocessing the data
+1. First the data was downloaded and checked to see if it needed to be processed.
+
+- The data was originally downloaded as a zip file from the reproducible research course [website][1]. After the data was downloaded, the file was extracted to the working directory. The the file was loaded into r in a table called rawactivitydata. The first few rows of the table can be viewed below.
+
+[1]: https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip
 
 
+```{r read in the data}
+rawactivitydata <- read.csv("activity.csv")
+head(rawactivitydata)
+```
 
-## What is mean total number of steps taken per day?
+- Next the class of each of the three columns was determined.
 
+```{r classes of the columns}
+class(rawactivitydata$steps)
+class(rawactivitydata$date)
+class(rawactivitydata$interval)
+```
 
+- The classes for the columns were all fine so the data was restored under the simplier variable name, "activitydata", which indicates that it was already processed.
 
-## What is the average daily activity pattern?
+```{r process the raw data}
+activitydata <- rawactivitydata
+```
 
+2. Then I attempted to answer the first question. What is the mean number of steps taken each day?
 
+- I started to answer this question by calculating the total number of steps for each day.  I stored the value in a variable called totalsteps.
 
-## Imputing missing values
+```{r total steps each day}
+totalsteps <- tapply(activitydata$steps,activitydata$date,sum)
+totalsteps
+```
 
+- Next I made a histogram of the total steps taken each day. 
 
+```{r Histogram of total steps taken each day}
+hist(totalsteps, main = "Histogram of Total Steps by Day", xlab = "Total Steps" , col="red")
+```
 
-## Are there differences in activity patterns between weekdays and weekends?
+- We can see from this histogram that the average number of steps per day should fall between 10000 and 15000.
+
+- Then the mean and median were calculated to see if they fall in that range.
+
+```{r mean and median number of steps per day}
+mean(totalsteps[!is.na(totalsteps)])
+median(totalsteps[!is.na(totalsteps)])
+```
+
+- As you can see from the calculations above both the mean and the median fell within that range.
+
+3. Then I moved on to answer the question:  What is the daily activity pattern?
+
+- I began to address this question by storing the intervals as a vector.
+
+```{r find the levels for the intervals}
+intervals <- as.numeric(levels(factor(activitydata$interval)))
+intervals
+```
+
+- Then I calculated the mean number of steps for each time interval. I stored those means as a variable.
+
+```{r find the mean number of steps for each interval}
+meansteps <- tapply(activitydata[!is.na(activitydata$steps),]$steps, activitydata[!is.na(activitydata$steps),]$interval, mean)
+```
+
+- Next I plotted the mean steps against the time intervals.
+
+```{r plot of mean steps versus time interval}
+plot(intervals, meansteps, type = "l", ylim = c(0,250), xlab = "5 Minute Time Interval", ylab = "Mean Number of Steps", main = "Mean Number of Steps in Each 5 Minute Interval")
+```
+
+- Then I looked for the 5 minute time interval with the greatest average activity.
+
+```{r find time interval with greatest average ativity}
+intervals[which.max(meansteps)]
+```
+
+- The intervals weren't particularilly well formated. 835 corresponds to 8:35 am.
+
+4. Now I moved on to dealing with the missing input values.
+
+- First I determined how many rows contained missing values.
+
+```{r how many rows had missing values}
+length(which(is.na(activitydata$steps)))
+```
+
+- Next I converted the missing values to the mean value for that specific time interval.
+
+```{r convert missing values to the mean values for set time interval}
+activitydata2 <- activitydata
+meanstepmatrix <- cbind(meansteps,intervals)
+index <- which(is.na(activitydata$steps))
+i <- 1
+for(i in 1:length(which(is.na(activitydata$steps)))){
+    row <- index[i]
+    Interval <- activitydata$interval[row]
+    activitydata2$steps[row] <- meanstepmatrix[meanstepmatrix[,2] == Interval,1]
+}
+head(activitydata2)
+```
+
+- Then I recalculated the total number of steps for each day
+
+```{r recalculate the total steps each day}
+totalsteps2 <- tapply(activitydata2$steps,activitydata2$date,sum)
+totalsteps2
+```
+
+- After that I remade the histogram of the total steps taken per day.
+
+``` {r make a histogram of the total number of steps for each day}
+hist(totalsteps2, main = "Histogram of Total Steps by Day (missing data included)", xlab = "Total Steps" , col="blue")
+```
+
+- As you can see the new histogram was petty similar to the original. There is not expected to be a large change in the mean or median for this data set.
+
+- Then I recalculated the mean and median for the total steps taken per day.
+
+```{r recalculated mean and median number of steps per day}
+mean(totalsteps2)
+median(totalsteps2)
+```
+
+- As you can see the mean value did not change. The median and the mean were equivalent. Neither of these pieces of information are paticullarly surprising, because the missing values were replaced with the mean values for that time interval.
+
+5.  Finally I attempeted to figure out if there were any differences between the actvity levels for the weekend and weekdays.
+
+- First I changed the class of the date column from factor to Date.
+
+```{r convert the date column from factor to Date class}
+activitydata$date <- as.Date(as.character(activitydata$date))
+
+```
+
+- Then I made a column that declared the day of the week for each observation in the data set.
+
+``` {r create a column for the day fot he week and add it to the dataset}
+activitydata <- cbind(activitydata,weekdays(activitydata$date))
+names(activitydata)[4] <- "weekday"
+head(activitydata)
+```
+
+- Next I made a second column that said whether the day was on the weekend or during the work week.
+
+```{r labeled each observation as workday or workweek}
+daytype <- NULL
+j <- 1
+for(j in 1:length(activitydata$date)){
+    if(activitydata$weekday[j] == "Saturday"|activitydata$weekday[j] == "Sunday"){
+    daytypenew <- "weekend"         
+    }   
+    else{
+    daytypenew <- "weekday"
+    }
+    daytype <- c(daytype,daytypenew)
+}
+activitydata <- cbind(activitydata,daytype)
+head(activitydata)
+```
+
+- Then I plotted the number of steps against the time interval for both the week days and the weekend.
+
+```{r plots comparing the average number of steps per time interval for weekdays and weekends}
+activitydatasplit <- split(activitydata, daytype)
+meanstepsweekend <- tapply(activitydatasplit$weekend[!is.na(activitydatasplit$weekend$steps),]$steps, activitydatasplit$weekend[!is.na(activitydatasplit$weekend$steps),]$interval, mean)
+meanstepsweekday <- tapply(activitydatasplit$weekday[!is.na(activitydatasplit$weekday$steps),]$steps, activitydatasplit$weekday[!is.na(activitydatasplit$weekday$steps),]$interval, mean)
+par(mfcol= c(2,1))
+par(mar = rep(4, 4))
+plot(intervals, meanstepsweekend, type = "l", ylim = c(0,250), xlab = "5 Minute Time Interval", ylab = "Mean Number of Steps", main = "Weekend")
+plot(intervals, meanstepsweekday, type = "l", ylim = c(0,250), xlab = "5 Minute Time Interval", ylab = "Mean Number of Steps", main = "Weekday")
+```
+
+- As can be seen from the plots above, the average number of steps during the week is definately at a maximum at about 7:00 or 8:00 am. However on the weekend the mean number of steps is more consistent throughout the day. Presumably this person is more active in mourning during the week, because they are getting ready for work (work, school or whatever occupies this particular persons day) and travelling there.  I'm assuming their weekend is more open for free activities, which is why the steps are seen to be more spread out throughout the day.
